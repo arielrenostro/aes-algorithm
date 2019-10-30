@@ -10,7 +10,7 @@ func h(s string) byte {
 	return decoded[0]
 }
 
-func sbox() [][]byte {
+func Sbox() [][]byte {
 	m := make([][]byte, 16)
 	m[0] = []byte{h("63"), h("7c"), h("77"), h("7b"), h("f2"), h("6b"), h("6f"), h("c5"), h("30"), h("01"), h("67"), h("2b"), h("fe"), h("d7"), h("ab"), h("76")}
 	m[1] = []byte{h("ca"), h("82"), h("c9"), h("7d"), h("fa"), h("59"), h("47"), h("f0"), h("ad"), h("d4"), h("a2"), h("af"), h("9c"), h("a4"), h("72"), h("c0")}
@@ -31,7 +31,7 @@ func sbox() [][]byte {
 	return m
 }
 
-func galois() [][]byte {
+func Galois() [][]byte {
 	m := make([][]byte, 16)
 	m[0] = []byte{h("00"), h("00"), h("19"), h("01"), h("32"), h("02"), h("1a"), h("c6"), h("4b"), h("c7"), h("1b"), h("68"), h("33"), h("ee"), h("df"), h("03")}
 	m[1] = []byte{h("64"), h("04"), h("e0"), h("0e"), h("34"), h("8d"), h("81"), h("ef"), h("4c"), h("71"), h("08"), h("c8"), h("f8"), h("69"), h("1c"), h("c1")}
@@ -73,11 +73,15 @@ func e() [][]byte {
 	return m
 }
 
-func multiply() [][]byte {
+func Multiply() [][]byte {
 	m := make([][]byte, 4)
 	m[0] = []byte{h("02"), h("03"), h("01"), h("01")}
 	m[1] = []byte{h("01"), h("02"), h("03"), h("01")}
 	m[2] = []byte{h("01"), h("01"), h("02"), h("03")}
 	m[3] = []byte{h("03"), h("01"), h("01"), h("02")}
 	return m
+}
+
+func RoundConstantMatrix() []byte {
+	return []byte {h("01"), h("02"), h("04"), h("08"), h("10"), h("20"), h("40"), h("80"), h("1b"), h("36")}
 }

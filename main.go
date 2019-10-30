@@ -56,7 +56,7 @@ func parseKey(keyRaw string) []byte {
 
 func fileExists(fileName string) bool {
 	_, err := os.Stat(fileName)
-	return os.IsNotExist(err)
+	return !os.IsNotExist(err)
 }
 
 func getArgs() *map[string]string {
