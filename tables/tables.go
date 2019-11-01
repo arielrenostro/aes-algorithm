@@ -10,6 +10,14 @@ func h(s string) byte {
 	return decoded[0]
 }
 
+func KEY() []byte {
+	return []byte{h("41"), h("45"), h("49"), h("4d"), h("42"), h("46"), h("4a"), h("4e"), h("43"), h("47"), h("4b"), h("4f"), h("44"), h("48"), h("4c"), h("50")}
+}
+
+func SOURCE() []byte {
+	return []byte{h("44"), h("4e"), h("56"), h("4e"), h("45"), h("56"), h("49"), h("54"), h("53"), h("4f"), h("4d"), h("4f"), h("45"), h("4c"), h("45"), h("21")}
+}
+
 func Sbox() [][]byte {
 	m := make([][]byte, 16)
 	m[0] = []byte{h("63"), h("7c"), h("77"), h("7b"), h("f2"), h("6b"), h("6f"), h("c5"), h("30"), h("01"), h("67"), h("2b"), h("fe"), h("d7"), h("ab"), h("76")}
@@ -52,7 +60,7 @@ func Galois() [][]byte {
 	return m
 }
 
-func e() [][]byte {
+func E() [][]byte {
 	m := make([][]byte, 16)
 	m[0] = []byte{h("01"), h("03"), h("05"), h("0f"), h("11"), h("33"), h("55"), h("ff"), h("1a"), h("2e"), h("72"), h("96"), h("a1"), h("f8"), h("13"), h("35")}
 	m[1] = []byte{h("5f"), h("e1"), h("38"), h("48"), h("d8"), h("73"), h("95"), h("a4"), h("f7"), h("02"), h("06"), h("0a"), h("1e"), h("22"), h("66"), h("aa")}
@@ -83,5 +91,5 @@ func Multiply() [][]byte {
 }
 
 func RoundConstantMatrix() []byte {
-	return []byte {h("01"), h("02"), h("04"), h("08"), h("10"), h("20"), h("40"), h("80"), h("1b"), h("36")}
+	return []byte{h("01"), h("02"), h("04"), h("08"), h("10"), h("20"), h("40"), h("80"), h("1b"), h("36")}
 }

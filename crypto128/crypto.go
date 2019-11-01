@@ -7,10 +7,115 @@ import (
 func Crypto(data, key []byte) []byte {
 	expandedKey := keyExpansion(key)
 	roundKeys := generateRoundKeys(expandedKey)
-
 	stateMatrices := generateAllStateMatrix(data)
+	cryptoMatrices(stateMatrices, roundKeys)
+	return joinMatrices(stateMatrices)
+}
 
-	return nil
+func joinMatrices(matrices [][][]byte) []byte {
+	encryptedLen := getEncryptedResultLenByMatrices(matrices)
+	result := make([]byte, encryptedLen)
+
+	for x, matrix := range matrices {
+		for y, line := range matrix {
+			for z, byte_ := range line {
+				result[(x*16)+(y*4)+z] = byte_
+			}
+		}
+	}
+
+	return result
+}
+
+func cryptoMatrices(matrices [][][]byte, roundKeys [][]byte) {
+	for _, matrix := range matrices {
+		cryptoMatrix(matrix, roundKeys)
+	}
+}
+
+func cryptoMatrix(matrix, roundKeys [][]byte) {
+	cryptoRoundKey(matrix, roundKeys, 0)
+
+	for idxRoundKey := 1; idxRoundKey < (len(roundKeys)/4)-1; idxRoundKey++ {
+		subWordMatrix(matrix)
+		shiftRows(matrix)
+		mixColumns(matrix)
+		cryptoRoundKey(matrix, roundKeys, idxRoundKey)
+	}
+
+	subWordMatrix(matrix)
+	shiftRows(matrix)
+	cryptoRoundKey(matrix, roundKeys, 10)
+}
+
+func mixColumns(matrix [][]byte) {
+	for x, line := range matrix {
+		for y, byte_ := range line {
+			line[y] = galoisMultiply(byte_, x, y)
+		}
+	}
+}
+
+func galoisMultiply(byte_ byte, x, y int) byte {
+	multiply := tables.Multiply()[x][y]
+	if byte_ == 0 || multiply == 0 {
+		return 0
+	}
+	if byte_ == 1 {
+		return multiply
+	}
+	if multiply == 1 {
+		return byte_
+	}
+
+	sum := byte_ + multiply
+	if sum >= 255 {
+		sum -= 255
+	}
+
+	high, low := breakByteInMiddle(sum)
+	galois := tables.Galois()[high][low]
+
+	high, low = breakByteInMiddle(galois)
+	return tables.E()[high][low]
+}
+
+func shiftRows(matrix [][]byte) {
+	for x, line := range matrix {
+		lenLine := len(line)
+		newLine := make([]byte, lenLine)
+
+		for y := 0; y < lenLine; y++ {
+			idx := y + x
+			if idx >= lenLine {
+				idx = idx - lenLine
+			}
+			newLine[y] = line[idx]
+		}
+
+		matrix[x] = line
+	}
+}
+
+func subWordMatrix(matrix [][]byte) {
+	for _, line := range matrix {
+		subWord(line)
+	}
+}
+
+func cryptoRoundKey(matrix, roundKeys [][]byte, idxRoundKey int) {
+	idxRoundKey = idxRoundKey * 4
+
+	for i := 0; i < len(matrix); i++ {
+		xor(matrix[i], roundKeys[i+idxRoundKey])
+	}
+}
+
+func getEncryptedResultLenByMatrices(matrices [][][]byte) int {
+	matricesLen := len(matrices)
+	matrixLen := len(matrices[0])
+	lineLen := len(matrices[0][0])
+	return matricesLen * matrixLen * lineLen
 }
 
 /*
@@ -21,7 +126,7 @@ func Crypto(data, key []byte) []byte {
    ########################
 */
 
-func generateAllStateMatrix(bytes []byte) {
+func generateAllStateMatrix(bytes []byte) [][][]byte {
 	size := len(bytes) / 16
 	if size == 0 {
 		size = 1
@@ -38,6 +143,8 @@ func generateAllStateMatrix(bytes []byte) {
 			}
 		}
 	}
+	// TODO Verify the last block
+	return matrices
 }
 
 /*

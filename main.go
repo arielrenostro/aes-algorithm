@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"ss-crypto/crypto128"
+	"ss-crypto/tables"
 	"strconv"
 	"strings"
 )
@@ -30,14 +31,21 @@ func main() {
 		panic("Source file not exists")
 	}
 
-	source, e := ioutil.ReadFile(args["-s"])
-	check(e)
+	//source, e := ioutil.ReadFile(args["-s"])
+	//check(e)
 
-	key := parseKey(args["-k"])
-	encryptedData := crypto128.Crypto(source, key)
+	//key := parseKey(args["-k"])
+	encryptedData := crypto128.Crypto(tables.SOURCE(), tables.KEY())
 
-	e = ioutil.WriteFile(args["-d"], encryptedData, 0644)
-	check(e)
+	for _, x := range encryptedData {
+		dst := make([]byte, hex.EncodedLen(1))
+		hex.Encode(dst, []byte{x})
+
+		fmt.Printf("%s ", dst)
+	}
+
+	//e = ioutil.WriteFile(args["-d"], encryptedData, 0644)
+	//check(e)
 }
 
 func parseKey(keyRaw string) []byte {
