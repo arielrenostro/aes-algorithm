@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"ss-crypto/crypto128"
-	"ss-crypto/tables"
+	"ss-crypto/utils"
 	"strconv"
 	"strings"
 )
@@ -24,28 +25,30 @@ func main() {
 	args := *getArgs()
 	exists := fileExists(args["-d"])
 	if exists {
-		panic("Destination file already exists")
+		e := os.Remove(args["-d"])
+		check(e)
 	}
 	exists = fileExists(args["-s"])
 	if !exists {
 		panic("Source file not exists")
 	}
 
-	//source, e := ioutil.ReadFile(args["-s"])
-	//check(e)
+	source, e := ioutil.ReadFile(args["-s"])
+	check(e)
 
-	//key := parseKey(args["-k"])
-	encryptedData := crypto128.Crypto(tables.SOURCE(), tables.KEY())
+	key := parseKey(args["-k"])
+	encryptedData := crypto128.Crypto(source, key)
 
-	for _, x := range encryptedData {
-		dst := make([]byte, hex.EncodedLen(1))
-		hex.Encode(dst, []byte{x})
+	e = ioutil.WriteFile(args["-d"], encryptedData, 0644)
+	check(e)
 
-		fmt.Printf("%s ", dst)
-	}
+	utils.PrintHexArray(encryptedData)
+}
 
-	//e = ioutil.WriteFile(args["-d"], encryptedData, 0644)
-	//check(e)
+func parseHexKey(s string) []byte {
+	data, e := hex.DecodeString(s)
+	check(e)
+	return data
 }
 
 func parseKey(keyRaw string) []byte {

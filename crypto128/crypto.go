@@ -1,25 +1,48 @@
 package crypto128
 
 import (
+	"fmt"
 	"ss-crypto/tables"
+	"ss-crypto/utils"
 )
 
 func Crypto(data, key []byte) []byte {
+	tables.InitTables()
+
 	expandedKey := keyExpansion(key)
 	roundKeys := generateRoundKeys(expandedKey)
 	stateMatrices := generateAllStateMatrix(data)
-	cryptoMatrices(stateMatrices, roundKeys)
-	return joinMatrices(stateMatrices)
+	encryptedMatrices := cryptoMatrices(stateMatrices, roundKeys)
+	return joinMatrices(encryptedMatrices)
+}
+
+func printMatrices(matrices [][][]byte, title string) {
+	if !utils.Debug() {
+		return
+	}
+
+	for x := 0; x < len(matrices); x++ {
+		fmt.Print("\n" + title)
+		fmt.Println(x)
+
+		utils.PrintMatrix(matrices[x], true)
+	}
 }
 
 func joinMatrices(matrices [][][]byte) []byte {
+	printMatrices(matrices, "Encrypted State ")
+
 	encryptedLen := getEncryptedResultLenByMatrices(matrices)
 	result := make([]byte, encryptedLen)
 
-	for x, matrix := range matrices {
-		for y, line := range matrix {
-			for z, byte_ := range line {
-				result[(x*16)+(y*4)+z] = byte_
+	for x := 0; x < len(matrices); x++ {
+		lenMatrix := len(matrices[x])
+
+		for y := 0; y < lenMatrix; y++ {
+			lenLine := len(matrices[x][y])
+
+			for z := 0; z < lenLine; z++ {
+				result[(x*lenMatrix*lenLine)+(y*lenLine)+z] = matrices[x][z][y]
 			}
 		}
 	}
@@ -27,37 +50,50 @@ func joinMatrices(matrices [][][]byte) []byte {
 	return result
 }
 
-func cryptoMatrices(matrices [][][]byte, roundKeys [][]byte) {
-	for _, matrix := range matrices {
-		cryptoMatrix(matrix, roundKeys)
+func cryptoMatrices(matrices, roundKeys [][][]byte) [][][]byte {
+	encryptedMatrices := make([][][]byte, len(matrices))
+	for i, matrix := range matrices {
+		encryptedMatrices[i] = cryptoMatrix(matrix, roundKeys)
 	}
+	return encryptedMatrices
 }
 
-func cryptoMatrix(matrix, roundKeys [][]byte) {
+func cryptoMatrix(matrix [][]byte, roundKeys [][][]byte) [][]byte {
 	cryptoRoundKey(matrix, roundKeys, 0)
 
-	for idxRoundKey := 1; idxRoundKey < (len(roundKeys)/4)-1; idxRoundKey++ {
+	for idxRoundKey := 1; idxRoundKey < len(roundKeys); idxRoundKey++ {
 		subWordMatrix(matrix)
+		matrix = utils.InvertMatrix(matrix)
 		shiftRows(matrix)
-		mixColumns(matrix)
+		if idxRoundKey < len(roundKeys)-1 {
+			matrix = mixColumns(matrix)
+		}
+		matrix = utils.InvertMatrix(matrix)
 		cryptoRoundKey(matrix, roundKeys, idxRoundKey)
 	}
 
-	subWordMatrix(matrix)
-	shiftRows(matrix)
-	cryptoRoundKey(matrix, roundKeys, 10)
+	return matrix
 }
 
-func mixColumns(matrix [][]byte) {
-	for x, line := range matrix {
-		for y, byte_ := range line {
-			line[y] = galoisMultiply(byte_, x, y)
+func mixColumns(matrix [][]byte) [][]byte {
+	newMatrix := utils.CreateMatrix(4, 4)
+
+	for x := 0; x < len(matrix); x++ {
+		for y := 0; y < len(matrix[x]); y++ {
+			galoisValues := make([]byte, len(matrix[x]))
+			for m := 0; m < len(galoisValues); m++ {
+				galoisValues[m] = galoisMultiply(matrix[m][y], tables.Multiply[x][m])
+			}
+			for _, galoisValue := range galoisValues {
+				newMatrix[x][y] = newMatrix[x][y] ^ galoisValue
+			}
 		}
 	}
+
+	return newMatrix
 }
 
-func galoisMultiply(byte_ byte, x, y int) byte {
-	multiply := tables.Multiply()[x][y]
+func galoisMultiply(byte_ byte, multiply byte) byte {
 	if byte_ == 0 || multiply == 0 {
 		return 0
 	}
@@ -68,32 +104,34 @@ func galoisMultiply(byte_ byte, x, y int) byte {
 		return byte_
 	}
 
-	sum := byte_ + multiply
-	if sum >= 255 {
-		sum -= 255
+	high, low := breakByteInMiddle(byte_)
+	galoisOfByte := tables.Galois[high][low]
+
+	high, low = breakByteInMiddle(multiply)
+	galoisOfMultiply := tables.Galois[high][low]
+
+	var sum int
+	sum = int(galoisOfByte) + int(galoisOfMultiply)
+	if sum > 0xFF {
+		sum -= 0xFF
 	}
 
-	high, low := breakByteInMiddle(sum)
-	galois := tables.Galois()[high][low]
-
-	high, low = breakByteInMiddle(galois)
-	return tables.E()[high][low]
+	high, low = breakByteInMiddle(byte(sum))
+	return tables.E[high][low]
 }
 
 func shiftRows(matrix [][]byte) {
-	for x, line := range matrix {
-		lenLine := len(line)
-		newLine := make([]byte, lenLine)
+	for x := 0; x < len(matrix); x++ {
+		line := make([]byte, len(matrix[x]))
+		copy(line, matrix[x])
 
-		for y := 0; y < lenLine; y++ {
+		for y := 0; y < len(line); y++ {
 			idx := y + x
-			if idx >= lenLine {
-				idx = idx - lenLine
+			if idx >= len(line) {
+				idx = idx - len(line)
 			}
-			newLine[y] = line[idx]
+			matrix[x][y] = line[idx]
 		}
-
-		matrix[x] = line
 	}
 }
 
@@ -103,11 +141,9 @@ func subWordMatrix(matrix [][]byte) {
 	}
 }
 
-func cryptoRoundKey(matrix, roundKeys [][]byte, idxRoundKey int) {
-	idxRoundKey = idxRoundKey * 4
-
+func cryptoRoundKey(matrix [][]byte, roundKeys [][][]byte, idxRoundKey int) {
 	for i := 0; i < len(matrix); i++ {
-		xor(matrix[i], roundKeys[i+idxRoundKey])
+		xor(matrix[i], roundKeys[idxRoundKey][i])
 	}
 }
 
@@ -133,7 +169,7 @@ func generateAllStateMatrix(bytes []byte) [][][]byte {
 	}
 	matrices := make([][][]byte, size)
 	for i := 0; i < size; i++ {
-		matrices[i] = createMatrix(4, 4)
+		matrices[i] = utils.CreateMatrix(4, 4)
 	}
 
 	for x := 0; x < size; x++ {
@@ -143,6 +179,9 @@ func generateAllStateMatrix(bytes []byte) [][][]byte {
 			}
 		}
 	}
+
+	printMatrices(matrices, "State ")
+
 	// TODO Verify the last block
 	return matrices
 }
@@ -155,19 +194,21 @@ func generateAllStateMatrix(bytes []byte) [][][]byte {
    #####################
 */
 
-func generateRoundKeys(expandedKey [][]byte) [][]byte {
-	roundKeys := createMatrix(44, 4)
-	populateRoundKeysByExpandedKey(roundKeys, expandedKey)
+func generateRoundKeys(expandedKey [][]byte) [][][]byte {
+	roundKeys := make([][][]byte, 11)
+	roundKeys[0] = expandedKey
 
-	for i := 4; i < 44; i = i + 4 {
-		lastWordRoundKey := roundKeys[i-1]
-		firstWordRoundKey := roundKeys[i-4]
-		idxRoundKey := (i / 4) - 1
-		roundKeys[i] = generateFirstWordRoundKey(lastWordRoundKey, firstWordRoundKey, idxRoundKey)
-		roundKeys[i+1] = xorNew(roundKeys[i-3], roundKeys[i])
-		roundKeys[i+2] = xorNew(roundKeys[i-2], roundKeys[i+1])
-		roundKeys[i+3] = xorNew(roundKeys[i-1], roundKeys[i+2])
+	for i := 1; i < 11; i++ {
+		roundKeys[i] = utils.CreateMatrix(4, 4)
+		lastWordRoundKey := roundKeys[i-1][3]
+		firstWordRoundKey := roundKeys[i-1][0]
+		roundKeys[i][0] = generateFirstWordRoundKey(lastWordRoundKey, firstWordRoundKey, i)
+		roundKeys[i][1] = xorNew(roundKeys[i-1][1], roundKeys[i][0])
+		roundKeys[i][2] = xorNew(roundKeys[i-1][2], roundKeys[i][1])
+		roundKeys[i][3] = xorNew(roundKeys[i-1][3], roundKeys[i][2])
 	}
+
+	printMatrices(roundKeys, "RoundKey ")
 
 	return roundKeys
 }
@@ -185,15 +226,14 @@ func generateFirstWordRoundKey(lastWordRoundKey, firstWordRoundKey []byte, idxRo
 
 func generateRoundConstant(idx int) []byte {
 	roundConstant := make([]byte, 4)
-	roundConstant[0] = tables.RoundConstantMatrix()[idx]
+	roundConstant[0] = tables.RoundConstantMatrix[idx]
 	return roundConstant
 }
 
 func subWord(bytes []byte) {
-	sbox := tables.Sbox()
 	for i := 0; i < len(bytes); i++ {
 		high, low := breakByteInMiddle(bytes[i])
-		bytes[i] = sbox[high][low]
+		bytes[i] = tables.Sbox[high][low]
 	}
 }
 
@@ -205,14 +245,6 @@ func rotWord(bytes []byte) {
 	bytes[len(bytes)-1] = first
 }
 
-func populateRoundKeysByExpandedKey(roundKeys, expandedKey [][]byte) {
-	for i := 0; i < len(expandedKey); i++ {
-		for x := 0; x < len(expandedKey[i]); x++ {
-			roundKeys[i][x] = expandedKey[x][i]
-		}
-	}
-}
-
 /*
    #########################
    ###					  ###
@@ -222,9 +254,9 @@ func populateRoundKeysByExpandedKey(roundKeys, expandedKey [][]byte) {
 */
 func keyExpansion(key []byte) [][]byte {
 	keyLen := len(key)
-	expandedKey := createMatrix(4, 4)
+	expandedKey := utils.CreateMatrix(4, 4)
 	for i := 0; i < keyLen; i++ {
-		expandedKey[i%4][i/4] = key[i]
+		expandedKey[i/4][i%4] = key[i]
 	}
 	return expandedKey
 }
@@ -236,13 +268,6 @@ func keyExpansion(key []byte) [][]byte {
    ###			  ###
    #################
 */
-func createMatrix(x, y int) [][]byte {
-	matrix := make([][]byte, x)
-	for i := 0; i < x; i++ {
-		matrix[i] = make([]byte, y)
-	}
-	return matrix
-}
 
 func xorNew(a, b []byte) []byte {
 	result := make([]byte, len(a))
