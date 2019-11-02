@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -43,12 +42,6 @@ func main() {
 	check(e)
 
 	utils.PrintHexArray(encryptedData)
-}
-
-func parseHexKey(s string) []byte {
-	data, e := hex.DecodeString(s)
-	check(e)
-	return data
 }
 
 func parseKey(keyRaw string) []byte {

@@ -4,9 +4,10 @@
     <list default="true" id="3a82d448-6542-487e-b5d6-40ff5eaa53f1" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crypto128/crypto.go" beforeDir="false" afterPath="$PROJECT_DIR$/crypto128/crypto.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.bin" beforeDir="false" afterPath="$PROJECT_DIR$/to_encrypt.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/encrypted.bin" beforeDir="false" afterPath="$PROJECT_DIR$/encrypted.bin" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tables/tables.go" beforeDir="false" afterPath="$PROJECT_DIR$/tables/tables.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/to_encrypt.txt" beforeDir="false" afterPath="$PROJECT_DIR$/to_encrypt.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/utils/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />

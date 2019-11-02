@@ -67,3 +67,7 @@ func HexToBytes(hexStr string) []byte {
 func Debug() bool {
 	return false
 }
+
+func GeneratePadding() bool {
+	return false
+}

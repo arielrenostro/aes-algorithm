@@ -42,7 +42,7 @@ func joinMatrices(matrices [][][]byte) []byte {
 			lenLine := len(matrices[x][y])
 
 			for z := 0; z < lenLine; z++ {
-				result[(x*lenMatrix*lenLine)+(y*lenLine)+z] = matrices[x][z][y]
+				result[(x*lenMatrix*lenLine)+(y*lenLine)+z] = matrices[x][y][z]
 			}
 		}
 	}
@@ -163,10 +163,8 @@ func getEncryptedResultLenByMatrices(matrices [][][]byte) int {
 */
 
 func generateAllStateMatrix(bytes []byte) [][][]byte {
-	size := len(bytes) / 16
-	if size == 0 {
-		size = 1
-	}
+	size, bytes := createPadding(bytes)
+
 	matrices := make([][][]byte, size)
 	for i := 0; i < size; i++ {
 		matrices[i] = utils.CreateMatrix(4, 4)
@@ -181,9 +179,32 @@ func generateAllStateMatrix(bytes []byte) [][][]byte {
 	}
 
 	printMatrices(matrices, "State ")
-
-	// TODO Verify the last block
 	return matrices
+}
+
+func createPadding(bytes []byte) (int, []byte) {
+	size := int(len(bytes) / 16)
+	if size == 0 {
+		size = 1
+	}
+
+	if utils.GeneratePadding() {
+		paddingSize := len(bytes) % 16
+		if paddingSize == 0 {
+			size += 1
+			paddingSize = 16
+		}
+
+		newBytesSize := len(bytes) + paddingSize
+		newBytes := make([]byte, newBytesSize)
+		copy(newBytes, bytes)
+		for i := len(bytes); i < newBytesSize; i++ {
+			newBytes[i] = byte(paddingSize)
+		}
+
+		return size, newBytes
+	}
+	return size, bytes
 }
 
 /*
