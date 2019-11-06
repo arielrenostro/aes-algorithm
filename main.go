@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -35,7 +36,8 @@ func main() {
 	source, e := ioutil.ReadFile(args["-s"])
 	check(e)
 
-	key := parseKey(args["-k"])
+	//key := parseKey(args["-k"])
+	key, _ := hex.DecodeString("D79E841FE9900CEB5857A0115B309E11")
 	encryptedData := crypto128.Crypto(source, key)
 
 	e = ioutil.WriteFile(args["-d"], encryptedData, 0644)

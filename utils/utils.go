@@ -69,5 +69,5 @@ func Debug() bool {
 }
 
 func GeneratePadding() bool {
-	return false
+	return true
 }

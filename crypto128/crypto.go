@@ -183,15 +183,10 @@ func generateAllStateMatrix(bytes []byte) [][][]byte {
 }
 
 func createPadding(bytes []byte) (int, []byte) {
-	size := int(len(bytes) / 16)
-	if size == 0 {
-		size = 1
-	}
-
+	size := int(len(bytes)/16) + 1
 	if utils.GeneratePadding() {
 		paddingSize := len(bytes) % 16
 		if paddingSize == 0 {
-			size += 1
 			paddingSize = 16
 		}
 
