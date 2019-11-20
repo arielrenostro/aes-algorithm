@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"ss-crypto/crypto128"
-	"ss-crypto/utils"
 	"strconv"
 	"strings"
 )
@@ -43,7 +41,7 @@ func main() {
 	e = ioutil.WriteFile(args["-d"], encryptedData, 0644)
 	check(e)
 
-	utils.PrintHexArray(encryptedData)
+	//utils.PrintHexArray(encryptedData)
 }
 
 func parseKey(keyRaw string) []byte {
