@@ -33,7 +33,11 @@ func Crypto(source, dest *os.File, key []byte) {
 		if count != len(buffer) {
 			paddingCreated = true
 
-			// TODO Continuar
+			paddingSize := count % 16
+			if paddingSize == 0 {
+				paddingSize = 16
+			}
+
 		} else {
 			for i := 0; i < len(parts); i++ {
 				offset := i * len(parts[i])
@@ -171,13 +175,6 @@ func cryptoRoundKey(matrix [][]byte, roundKeys [][][]byte, idxRoundKey int) {
 	for i := 0; i < len(matrix); i++ {
 		xor(matrix[i], roundKeys[idxRoundKey][i])
 	}
-}
-
-func getEncryptedResultLenByMatrices(matrices [][][]byte) int {
-	matricesLen := len(matrices)
-	matrixLen := len(matrices[0])
-	lineLen := len(matrices[0][0])
-	return matricesLen * matrixLen * lineLen
 }
 
 func createPadding(bytes []byte) (int, []byte) {
