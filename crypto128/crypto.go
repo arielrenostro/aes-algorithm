@@ -2,18 +2,73 @@ package crypto128
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"ss-crypto/tables"
 	"ss-crypto/utils"
 )
 
-func Crypto(data, key []byte) []byte {
+func Crypto(source, dest *os.File, key []byte) {
+	bufferSize := 4096
+	routinesCount := 4
+	byterPerRoutine := bufferSize / routinesCount
+
 	tables.InitTables()
 
 	expandedKey := keyExpansion(key)
 	roundKeys := generateRoundKeys(expandedKey)
-	stateMatrices := generateAllStateMatrix(data)
-	encryptedMatrices := cryptoMatrices(stateMatrices, roundKeys)
-	return joinMatrices(encryptedMatrices)
+
+	paddingCreated := false
+	parts := utils.CreateMatrix(routinesCount, byterPerRoutine)
+	buffer := make([]byte, bufferSize)
+	for {
+		count, e := source.Read(buffer)
+		if count == 0 && e == io.EOF {
+			break
+		}
+		if e != nil {
+			panic(e)
+		}
+
+		if count != len(buffer) {
+			paddingCreated = true
+
+			// TODO Continuar
+		} else {
+			for i := 0; i < len(parts); i++ {
+				offset := i * len(parts[i])
+				if offset > 0 {
+					offset--
+				}
+				copyArrayData(buffer, parts[i], offset)
+			}
+		}
+
+		// TODO executar as rotinas de cripto
+
+		for i := 0; i < len(parts); i++ {
+			_, e := dest.Write(parts[i])
+			if e != nil {
+				panic(e)
+			}
+		}
+	}
+
+	if !paddingCreated {
+		// TODO criar padding e cripto
+	}
+
+	//cryptoMatrix(matrix, roundKeys)
+	//
+	//createPadding();
+}
+
+func copyArrayData(source []byte, dest []byte, offset int) {
+	x := offset
+	for i := 0; i < len(dest); i++ {
+		dest[i] = source[x]
+		x++
+	}
 }
 
 func printMatrices(matrices [][][]byte, title string) {
@@ -27,35 +82,6 @@ func printMatrices(matrices [][][]byte, title string) {
 
 		utils.PrintMatrix(matrices[x], true)
 	}
-}
-
-func joinMatrices(matrices [][][]byte) []byte {
-	printMatrices(matrices, "Encrypted State ")
-
-	encryptedLen := getEncryptedResultLenByMatrices(matrices)
-	result := make([]byte, encryptedLen)
-
-	for x := 0; x < len(matrices); x++ {
-		lenMatrix := len(matrices[x])
-
-		for y := 0; y < lenMatrix; y++ {
-			lenLine := len(matrices[x][y])
-
-			for z := 0; z < lenLine; z++ {
-				result[(x*lenMatrix*lenLine)+(y*lenLine)+z] = matrices[x][y][z]
-			}
-		}
-	}
-
-	return result
-}
-
-func cryptoMatrices(matrices, roundKeys [][][]byte) [][][]byte {
-	encryptedMatrices := make([][][]byte, len(matrices))
-	for i, matrix := range matrices {
-		encryptedMatrices[i] = cryptoMatrix(matrix, roundKeys)
-	}
-	return encryptedMatrices
 }
 
 func cryptoMatrix(matrix [][]byte, roundKeys [][][]byte) [][]byte {
@@ -154,52 +180,21 @@ func getEncryptedResultLenByMatrices(matrices [][][]byte) int {
 	return matricesLen * matrixLen * lineLen
 }
 
-/*
-   ########################
-   ###                  ###
-   ###   STATE MATRIX   ###
-   ###                  ###
-   ########################
-*/
-
-func generateAllStateMatrix(bytes []byte) [][][]byte {
-	size, bytes := createPadding(bytes)
-
-	matrices := make([][][]byte, size)
-	for i := 0; i < size; i++ {
-		matrices[i] = utils.CreateMatrix(4, 4)
-	}
-
-	for x := 0; x < size; x++ {
-		for y := 0; y < 4; y++ {
-			for z := 0; z < 4; z++ {
-				matrices[x][y][z] = bytes[(x*16)+(y*4)+(z)]
-			}
-		}
-	}
-
-	printMatrices(matrices, "State ")
-	return matrices
-}
-
 func createPadding(bytes []byte) (int, []byte) {
 	size := int(len(bytes)/16) + 1
-	if utils.GeneratePadding() {
-		paddingSize := len(bytes) % 16
-		if paddingSize == 0 {
-			paddingSize = 16
-		}
-
-		newBytesSize := len(bytes) + paddingSize
-		newBytes := make([]byte, newBytesSize)
-		copy(newBytes, bytes)
-		for i := len(bytes); i < newBytesSize; i++ {
-			newBytes[i] = byte(paddingSize)
-		}
-
-		return size, newBytes
+	paddingSize := len(bytes) % 16
+	if paddingSize == 0 {
+		paddingSize = 16
 	}
-	return size, bytes
+
+	newBytesSize := len(bytes) + paddingSize
+	newBytes := make([]byte, newBytesSize)
+	copy(newBytes, bytes)
+	for i := len(bytes); i < newBytesSize; i++ {
+		newBytes[i] = byte(paddingSize)
+	}
+
+	return size, newBytes
 }
 
 /*
