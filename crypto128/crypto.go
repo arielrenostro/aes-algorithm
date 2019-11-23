@@ -46,13 +46,14 @@ func Crypto(source, dest *os.File, key []byte) {
 			for i := count; i < countWithPadding; i++ {
 				buffer[i] = byte(paddingSize)
 			}
-			splitBuffer(parts, buffer, countWithPadding)
+			parts = splitBuffer(parts, buffer, countWithPadding)
 
 			partsToEncrypt = int(countWithPadding / byterPerRoutine)
-			partLen = countWithPadding % partsToEncrypt
+			partLen = countWithPadding % byterPerRoutine
 
 			if partLen > 0 {
 				partsToEncrypt++
+				partLen = byterPerRoutine
 			}
 		} else {
 			splitBuffer(parts, buffer, count)
@@ -62,9 +63,25 @@ func Crypto(source, dest *os.File, key []byte) {
 
 		for i := 0; i < partsToEncrypt; i++ {
 			if i+1 == partsToEncrypt {
-				go cryptoPart(&wg, parts[i], partLen, roundKeys)
+				if utils.Async() {
+					go func() {
+						cryptoPart(parts[i], roundKeys)
+						wg.Done()
+					}()
+				} else {
+					cryptoPart(parts[i], roundKeys)
+					wg.Done()
+				}
 			} else {
-				go cryptoPart(&wg, parts[i], byterPerRoutine, roundKeys)
+				if utils.Async() {
+					go func() {
+						cryptoPart(parts[i], roundKeys)
+						wg.Done()
+					}()
+				} else {
+					cryptoPart(parts[i], roundKeys)
+					wg.Done()
+				}
 			}
 		}
 
@@ -89,8 +106,8 @@ func Crypto(source, dest *os.File, key []byte) {
 	}
 }
 
-func cryptoPart(wg *sync.WaitGroup, bytes []byte, count int, roundKeys [][][]byte) {
-	for i := 0; i < len(bytes)/count; i++ {
+func cryptoPart(bytes []byte, count int, roundKeys [][][]byte) {
+	for i := 0; i < count/16; i++ {
 		offset := i * 16
 		matrix := keyExpansion(bytes, offset)
 		encryptedMatrix := cryptoMatrix(matrix, roundKeys)
@@ -100,7 +117,6 @@ func cryptoPart(wg *sync.WaitGroup, bytes []byte, count int, roundKeys [][][]byt
 			}
 		}
 	}
-	wg.Done()
 }
 
 func writeFile(file *os.File, bytes []byte) {
@@ -110,7 +126,7 @@ func writeFile(file *os.File, bytes []byte) {
 	}
 }
 
-func splitBuffer(parts [][]byte, buffer []byte, bufferSize int) {
+func splitBuffer(parts [][]byte, buffer []byte, bufferSize int) [][]byte {
 	for i := 0; i < len(parts); i++ {
 		offset := i * len(parts[i])
 		if offset > bufferSize {
@@ -119,8 +135,9 @@ func splitBuffer(parts [][]byte, buffer []byte, bufferSize int) {
 		if offset > 0 {
 			offset--
 		}
-		copyArrayData(buffer, parts[i], offset)
+		parts[i] = copyArrayData(buffer, parts[i], offset)
 	}
+	return parts
 }
 
 func isLastBuffer(count int, buffer []byte) bool {
@@ -321,10 +338,9 @@ func rotWord(bytes []byte) {
    #########################
 */
 func keyExpansion(key []byte, offset int) [][]byte {
-	keyLen := len(key)
 	expandedKey := utils.CreateMatrix(4, 4)
 	x := offset
-	for i := 0; i < keyLen; i++ {
+	for i := 0; i < 16; i++ {
 		expandedKey[i/4][i%4] = key[x]
 		x++
 	}

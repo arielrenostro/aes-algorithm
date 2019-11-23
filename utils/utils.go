@@ -71,3 +71,7 @@ func Debug() bool {
 func GeneratePadding() bool {
 	return true
 }
+
+func Async() bool {
+	return false
+}
