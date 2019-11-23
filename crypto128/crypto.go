@@ -6,65 +6,125 @@ import (
 	"os"
 	"ss-crypto/tables"
 	"ss-crypto/utils"
+	"sync"
 )
 
 func Crypto(source, dest *os.File, key []byte) {
+	var wg sync.WaitGroup
+
 	bufferSize := 4096
 	routinesCount := 4
 	byterPerRoutine := bufferSize / routinesCount
 
 	tables.InitTables()
 
-	expandedKey := keyExpansion(key)
+	expandedKey := keyExpansion(key, 0)
 	roundKeys := generateRoundKeys(expandedKey)
 
-	paddingCreated := false
+	needsPadding := true
 	parts := utils.CreateMatrix(routinesCount, byterPerRoutine)
 	buffer := make([]byte, bufferSize)
 	for {
+		partsToEncrypt := 4
+		partLen := byterPerRoutine
+
 		count, e := source.Read(buffer)
 		if count == 0 && e == io.EOF {
 			break
 		}
-		if e != nil {
+		if e != nil && e != io.EOF {
 			panic(e)
 		}
 
-		if count != len(buffer) {
-			paddingCreated = true
-
+		if isLastBuffer(count, buffer) {
+			needsPadding = false
 			paddingSize := count % 16
 			if paddingSize == 0 {
 				paddingSize = 16
 			}
+			countWithPadding := count + paddingSize
+			for i := count; i < countWithPadding; i++ {
+				buffer[i] = byte(paddingSize)
+			}
+			splitBuffer(parts, buffer, countWithPadding)
 
+			partsToEncrypt = int(countWithPadding / byterPerRoutine)
+			partLen = countWithPadding % partsToEncrypt
+
+			if partLen > 0 {
+				partsToEncrypt++
+			}
 		} else {
-			for i := 0; i < len(parts); i++ {
-				offset := i * len(parts[i])
-				if offset > 0 {
-					offset--
-				}
-				copyArrayData(buffer, parts[i], offset)
+			splitBuffer(parts, buffer, count)
+		}
+
+		wg.Add(partsToEncrypt)
+
+		for i := 0; i < partsToEncrypt; i++ {
+			if i+1 == partsToEncrypt {
+				go cryptoPart(&wg, parts[i], partLen, roundKeys)
+			} else {
+				go cryptoPart(&wg, parts[i], byterPerRoutine, roundKeys)
 			}
 		}
 
-		// TODO executar as rotinas de cripto
+		wg.Wait()
 
 		for i := 0; i < len(parts); i++ {
-			_, e := dest.Write(parts[i])
-			if e != nil {
-				panic(e)
-			}
+			writeFile(dest, parts[i])
 		}
 	}
 
-	if !paddingCreated {
-		// TODO criar padding e cripto
+	if needsPadding {
+		matrix := utils.CreateMatrix(4, 4)
+		for x := 0; x < len(matrix); x++ {
+			for y := 0; y < len(matrix[x]); y++ {
+				matrix[x][y] = byte(16)
+			}
+		}
+		newMatrix := cryptoMatrix(matrix, roundKeys)
+		for x := 0; x < len(newMatrix); x++ {
+			writeFile(dest, newMatrix[x])
+		}
 	}
+}
 
-	//cryptoMatrix(matrix, roundKeys)
-	//
-	//createPadding();
+func cryptoPart(wg *sync.WaitGroup, bytes []byte, count int, roundKeys [][][]byte) {
+	for i := 0; i < len(bytes)/count; i++ {
+		offset := i * 16
+		matrix := keyExpansion(bytes, offset)
+		encryptedMatrix := cryptoMatrix(matrix, roundKeys)
+		for x := 0; x < len(encryptedMatrix); x++ {
+			for y := 0; y < len(encryptedMatrix[x]); y++ {
+				bytes[offset+(x*4)+y] = encryptedMatrix[x][y]
+			}
+		}
+	}
+	wg.Done()
+}
+
+func writeFile(file *os.File, bytes []byte) {
+	_, e := file.Write(bytes)
+	if e != nil {
+		panic(e)
+	}
+}
+
+func splitBuffer(parts [][]byte, buffer []byte, bufferSize int) {
+	for i := 0; i < len(parts); i++ {
+		offset := i * len(parts[i])
+		if offset > bufferSize {
+			break
+		}
+		if offset > 0 {
+			offset--
+		}
+		copyArrayData(buffer, parts[i], offset)
+	}
+}
+
+func isLastBuffer(count int, buffer []byte) bool {
+	return count != len(buffer)
 }
 
 func copyArrayData(source []byte, dest []byte, offset int) {
@@ -260,11 +320,13 @@ func rotWord(bytes []byte) {
    ###					  ###
    #########################
 */
-func keyExpansion(key []byte) [][]byte {
+func keyExpansion(key []byte, offset int) [][]byte {
 	keyLen := len(key)
 	expandedKey := utils.CreateMatrix(4, 4)
+	x := offset
 	for i := 0; i < keyLen; i++ {
-		expandedKey[i/4][i%4] = key[i]
+		expandedKey[i/4][i%4] = key[x]
+		x++
 	}
 	return expandedKey
 }
